@@ -1,6 +1,6 @@
 ---
-title: "Daoo-Assignment"
-author: "Alireza Rezaei -- 12207501"
+title: "Data Analysis with R"
+author: "Alireza Rezaei"
 format: docx
 editor: visual
 ---
@@ -450,7 +450,5 @@ The Wilcoxon rank sum test with continuity correction shows a p-value of 0.0507,
 
 The Kruskal-Wallis rank sum test shows a p-value of 0.0273, indicating that there is a statistically significant association between "agea" and "imwbcnt." This suggests that younger people are more likely to believe that immigrants make the country a better place to live.
 
-
-# Conclusion
 
 Overall, the results provide mixed support for the hypotheses. Higher levels of happiness (happy) and younger age (agea) are both positively associated with the belief that immigrants make the country a better place to live. However, the relationship between income (hinctnta) and belief in immigrant impact is not as clear-cut and may require further investigation. Similarly, while there is a weak indication of an association between having children (chldhhe) and belief in immigrant impact, it is not strongly supported.
