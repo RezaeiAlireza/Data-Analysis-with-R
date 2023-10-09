@@ -1,0 +1,456 @@
+---
+title: "Daoo-Assignment"
+author: "Alireza Rezaei -- 12207501"
+format: docx
+editor: visual
+---
+
+# Question
+
+### What factors predict whether someone believes that immigrants make the country a worse or better place to live?
+
+# Hypotheses
+
+### - H1
+
+People with higher income levels (`hinctnta`) are more likely to believe that immigrants make the country a better place to live
+
+### - H2
+
+People who report higher levels of happiness (`happy`) are more likely to believe that immigrants make the country a better place to live.
+
+### - H3
+
+People with children (`chldhhe`) are more likely to believe that immigrants make the country a better place to live.
+
+### - H4
+
+Younger people (`age`) are more likely to believe that immigrants make the country a better place to live.
+
+
+```{r}
+#| include: false
+
+library(haven)
+library(dplyr)
+library(knitr)
+library(Hmisc)
+library(carData)
+library(car)
+library(ggplot2)
+library(reshape2)  # To melt the correlation matrix
+
+```
+
+# Cleaning Data
+
+### - Reading Dataset
+
+```{r}
+#| label: Data Loading & Preprocessing data
+
+df <- read_spss("dataset.sav")
+
+na_columns <- colSums(is.na(df)) == nrow(df)
+```
+
+### - Handling NA values
+
+```{r}
+# Identify columns with all NA values
+na_columns <- sapply(df, function(x) all(is.na(x)))
+
+# Remove columns with all NA values
+df_clean <- df[, !na_columns]
+
+# Calculate the number of NA values in each column
+na_items <- colSums(is.na(df_clean))
+
+# Identify columns with more than 75% NA observations
+columns_to_remove <- names(na_items[na_items > 1875])
+
+# Remove columns with more than 1875 NA observations
+df_clean <- df_clean[, !(names(df_clean) %in% columns_to_remove)]
+
+# Changing NA observations to median or empty string
+for (col in colnames(df_clean)) {
+  if (is.numeric(df_clean[[col]])) {
+    df_clean[[col]][is.na(df_clean[[col]])] <- median(df_clean[[col]], na.rm = TRUE)
+  } else if (is.character(df_clean[[col]])) {
+    df_clean[[col]][is.na(df_clean[[col]])] <- ""
+  }
+}
+```
+
+### - Removing unique value columns
+
+```{r}
+# Find columns with one unique value
+single_value_columns <- sapply(df_clean, function(x) length(unique(x)) == 1)
+
+# Remove columns with one unique value
+df_clean <- df_clean[, !single_value_columns]
+```
+
+### - Removing duplicated rows
+
+```{r}
+# Remove duplicate rows
+df_clean <- distinct(df_clean)
+```
+
+### - Cloning Data
+
+```{r}
+# Cloning Dataset
+dataset <- df_clean
+```
+
+# Normality & Homogeneity Check
+
+```{r}
+# Checking the normality and variance homogeneity of the 'imwbcnt' variable
+shapiro.test(dataset$imwbcnt)
+bartlett.test(imwbcnt ~ hinctnta, data = dataset)
+```
+
+Since the p-value for Shapiro-Wilk normality test is very low, we would reject the null hypothesis. This suggests that 'imwbcnt' variable is not normally distributed. In this case, we should consider using non-parametric alternatives to the t-tests and ANOVA, as those tests assume normality.
+I used Wilcoxon and Kruskal-Wallis Test as my non-parametric tests but also I included t-test and ANOVA too to compare the results of them.
+
+# Plots
+### - Histogram & Q-Q plot of 'imwbcnt'
+
+```{r}
+# Histogram
+hist(dataset$imwbcnt , main = "Histogram of imwbcnt", xlab = "imwbcnt", col = "purple")
+```
+
+From the plot above we can see that most of the people believe that immigrants have no influence over the livability condition of the country. However, more people believe that immigrants make a country worse to live than better.
+
+```{r}
+# Q-Q plot
+qqnorm(dataset$imwbcnt , main = "Q-Q Plot of imwbcnt")
+qqline(dataset$imwbcnt , col = "orange", lwd = 2)
+```
+
+### - Scatter Plot - Relationship between 'happy' and 'imwbcnt'
+
+```{r}
+# Scatter plot of 'happy' vs 'imwbcnt'
+plot(dataset$happy, dataset$imwbcnt, xlab = "Happiness", ylab = "imwbcnt", main = "Scatter Plot of Happiness vs. imwbcnt")
+
+```
+Since the data points roughly form a linear pattern, it indicates a positive correlation between the two variables. A positive correlation means that as "Happiness" increases, "imwbcnt" also tends to increase.
+
+### - Bar Plot - Frequency or distribution of 'hinctnta', 'chldhhe'
+
+```{r}
+# Bar plot for 'hinctnta'
+barplot(table(dataset$hinctnta), xlab = "Income Level", ylab = "Frequency", main = "Bar Plot of Income Level")
+```
+By observing the plot above we can say that most people are in the average income range
+```{r}
+# Bar plot for 'chldhhe'
+barplot(table(dataset$chldhhe), xlab = "Children in Household", ylab = "Frequency", main = "Bar Plot of Children in Household")
+```
+By observing the plot above we can see that the number of individuals with child is roughly twice of the ones without.
+
+# Mean Comparison
+
+## Wilcoxon Rank-Sum Test
+
+```{r}
+# Wilcoxon rank-sum test for 'imwbcnt' with respect to 'chldhhe'
+wilcox.test(imwbcnt ~ chldhhe, data = dataset)
+
+# Create a new grouping variable based on 'happy'
+dataset$happy_group <- ifelse(dataset$happy <= 5, "Low Happiness", "High Happiness")
+
+# Perform the Wilcoxon rank-sum test for 'imwbcnt' with respect to 'happy_group'
+wilcox.test(imwbcnt ~ happy_group, data = dataset)
+
+# Create a new grouping variable based on 'agea'
+dataset$age_group <- ifelse(dataset$agea <= 50, "Under 50yrs", "Above 50yrs")
+
+# Wilcoxon rank-sum test for 'imwbcnt' with respect to 'agea'
+wilcox.test(imwbcnt ~ age_group, data = dataset)
+
+# Create a new grouping variable based on 'hinctnta'
+dataset$income_group <- ifelse(dataset$hinctnta <= 5, "Average and below", "Above average")
+
+# Wilcoxon rank-sum test for 'imwbcnt' with respect to 'hinctnta'
+wilcox.test(imwbcnt ~ income_group, data = dataset)
+
+```
+### - chldhhe
+The p-value for the comparison of "imwbcnt" between groups with and without children is 0.01119. Since the p-value is less than the significance level (commonly set to 0.05), we can conclude that there is a statistically significant difference in "imwbcnt" between the two groups.
+
+### - Happy
+The p-value for the comparison of "imwbcnt" between groups with low happiness and high happiness is very small (1.671e-12). Again, it is less than the significance level, indicating a highly significant difference in "imwbcnt" between the two happiness groups.
+
+### - Age
+The p-value for the comparison of "imwbcnt" between the two age groups is 0.1302. In this case, the p-value is greater than the significance level (0.05), indicating that we do not have enough evidence to reject the null hypothesis, and there is no statistically significant difference in "imwbcnt" between the two age groups.
+So the age does not in play a role in the people's opinion on the immigrants making the country a better or worst place.
+
+### - Income
+The p-value for the comparison of "imwbcnt" between the two income groups is 0.1326, which is greater than the significance level. As with the age group, there is no statistically significant difference in "imwbcnt" between the two income groups.
+
+### - Box Plot - Distribution of 'imwbcnt' across 'happy_group'
+
+```{r}
+# Box plot for 'imwbcnt' across 'happy_group'
+boxplot(imwbcnt ~ happy_group, data = dataset, xlab = "Happiness Group", ylab = "imwbcnt", main = "Box Plot of imwbcnt across Happiness Group")
+
+# Box plot for 'imwbcnt' across 'age'
+boxplot(imwbcnt ~ age_group, data = dataset, xlab = "Age Group", ylab = "imwbcnt", main = "Box Plot of imwbcnt across age Group")
+
+# Box plot for 'imwbcnt' across 'income'
+boxplot(imwbcnt ~ income_group, data = dataset, xlab = "Income Group", ylab = "imwbcnt", main = "Box Plot of imwbcnt across income Group")
+
+# Box plot for 'imwbcnt' across 'child'
+boxplot(imwbcnt ~ chldhhe, data = dataset, xlab = "with or without child", ylab = "imwbcnt", main = "Box Plot of imwbcnt across with or without children")
+```
+The horizontal line inside each box represents the median value of "imwbcnt" for each group.
+The height and width of the boxes show the interquartile range (IQR) of "imwbcnt" for each group.
+Individual points beyond the whiskers of the box plot are considered outliers. 
+
+- We can see that different level of happiness influences the view of people about my question
+- Same is appliable for individuals with children against those without children but not that significant.
+- As for age and income, we can see they are irrelevant to their view.
+
+## Kruskal-Wallis Test
+
+```{r}
+# kruskal test for 'imwbcnt' with respect to 'chldhhe'
+kruskal.test(imwbcnt ~ chldhhe, data = dataset)
+
+# kruskal test for 'imwbcnt' with respect to 'happy'
+kruskal.test(imwbcnt ~ happy, data = dataset)
+
+# kruskal test for 'imwbcnt' with respect to 'agea'
+kruskal.test(imwbcnt ~ agea, data = dataset)
+
+# kruskal test for 'imwbcnt' with respect to 'hinctnta'
+kruskal.test(imwbcnt ~ hinctnta, data = dataset)
+```
+### - imwbcnt by chldhhe
+ - Kruskal-Wallis chi-squared: 6.4348
+ - Degrees of freedom (df): 1
+ - p-value: 0.01119
+The p-value (0.01119) is less than the significance level (usually set to 0.05), which indicates that there is a significant difference in the distribution of "imwbcnt" among the different levels of the variable "chldhhe." In other words, there is evidence to suggest that the median imwbcnt values are different between the two levels of "chldhhe."
+
+### - imwbcnt by happy
+ - Kruskal-Wallis chi-squared: 145.93
+ - Degrees of freedom (df): 10
+ - p-value: < 2.2e-16
+The p-value (< 2.2e-16, which is very close to zero) is highly significant, indicating that there is a significant difference in the distribution of "imwbcnt" among the different levels of the variable "happy." This means that the median imwbcnt values differ significantly across the ten levels of "happy."
+
+### - imwbcnt by agea
+ - Kruskal-Wallis chi-squared: 100.28
+ - Degrees of freedom (df): 75
+ - p-value: 0.0273
+The p-value (0.0273) is less than 0.05, suggesting a significant difference in the distribution of "imwbcnt" among the different levels of the variable "agea." Therefore, the median imwbcnt values are different across the age groups.
+
+### - imwbcnt by hinctnta
+ - Kruskal-Wallis chi-squared: 24.614
+ - Degrees of freedom (df): 9
+ - p-value: 0.003429
+The p-value (0.003429) is less than 0.05, indicating a significant difference in the distribution of "imwbcnt" among the different levels of the variable "hinctnta." This means that the median imwbcnt values are different between the income groups.
+
+## (t-test)
+
+### imwbcnt & hinctnta
+
+```{r}
+
+# Subset the data 
+group_positive_belief <- subset(dataset, imwbcnt > 6)$hinctnta
+group_negative_belief <- subset(dataset, imwbcnt <= 6)$hinctnta
+
+# Run the t-test
+t.test(group_positive_belief, group_negative_belief)
+
+```
+The p-value (0.2103) is greater than the significance level (usually set to 0.05), which indicates that there is not enough evidence to reject the null hypothesis. The null hypothesis states that there is no difference in the means of the two groups. Therefore, based on the p-value, we do not have sufficient evidence to conclude that there is a significant difference in means between group_positive_belief and group_negative_belief.
+
+### imwbcnt & happy
+
+```{r}
+# Subset the data 
+group_positive_belief <- subset(dataset, imwbcnt > 6)$happy
+group_negative_belief <- subset(dataset, imwbcnt <= 6)$happy
+
+# Run the t-test
+t.test(group_positive_belief, group_negative_belief)
+
+```
+The p-value (< 2.2e-16) is extremely small, much smaller than the usual significance level of 0.05. This indicates strong evidence against the null hypothesis. The null hypothesis states that there is no difference in the means of the two groups. With such a small p-value, we can safely reject the null hypothesis and conclude that there is a significant difference in means between group_positive_belief and group_negative_belief.
+
+### imwbcnt & chldhhe
+
+```{r}
+
+# Subset the data 
+group_positive_belief <- subset(dataset, imwbcnt > 6)$chldhhe
+group_negative_belief <- subset(dataset, imwbcnt <= 6)$chldhhe
+
+# Run the t-test
+t.test(group_positive_belief, group_negative_belief)
+
+```
+The p-value (0.0002522) is very small, indicating strong evidence against the null hypothesis. The null hypothesis states that there is no difference in the means of the two groups. With such a small p-value, we can reject the null hypothesis and conclude that there is a significant difference in means between group_positive_belief and group_negative_belief.
+
+### imwbcnt & agea
+
+```{r}
+
+# Subset the data 
+group_positive_belief <- subset(dataset, imwbcnt > 6)$agea
+group_negative_belief <- subset(dataset, imwbcnt <= 6)$agea
+
+# Run the t-test
+t.test(group_positive_belief, group_negative_belief)
+
+```
+The p-value (2.871e-10) is extremely small, indicating strong evidence against the null hypothesis. The null hypothesis states that there is no difference in the means of the two groups. With such a small p-value, we can reject the null hypothesis and conclude that there is a significant difference in means between group_positive_belief and group_negative_belief.
+
+<span style="color: red;">We can see that t-test shows opposite results comparing to our non-parametric methods</span>
+
+# One-Way Anova
+
+```{r}
+# Fit and print ANOVA for 'hinctnta'
+model_hinctnta <- aov(imwbcnt ~ hinctnta, data = dataset)
+anova_hinctnta <- summary(model_hinctnta)
+print("imwbcnt - hinctnta\n")
+print(anova_hinctnta)
+
+# Fit and print ANOVA for 'happy'
+model_happy <- aov(imwbcnt ~ happy, data = dataset)
+anova_happy <- summary(model_happy)
+print("imwbcnt - happy\n")
+print(anova_happy)
+
+# Fit and print ANOVA for 'chldhhe'
+model_chldhhe <- aov(imwbcnt ~ chldhhe, data = dataset)
+anova_chldhhe <- summary(model_chldhhe)
+print("imwbcnt - chldhhe\n")
+print(anova_chldhhe)
+
+# Fit and print ANOVA for 'agea'
+model_agea <- aov(imwbcnt ~ agea, data = dataset)
+anova_agea <- summary(model_agea)
+print("imwbcnt - agea\n")
+print(anova_agea)
+```
+### "imwbcnt - hinctnta":
+
+- "Df" represents the degrees of freedom, where 1 refers to the degrees of freedom for the independent variable "hinctnta" and 2497 for the residuals (error).
+- "Sum Sq" is the sum of squares between groups and residuals.
+- "Mean Sq" is the mean of squares between groups and residuals.
+- "F value" is the F-statistic, which measures the variability between group means relative to the variability within groups. It indicates if there is a significant difference between the groups' means.
+- "Pr(>F)" is the p-value associated with the F-statistic. It determines the statistical significance of the differences between group means. In this case, the p-value is 0.188, indicating that the relationship between "imwbcnt" and "hinctnta" is not statistically significant.
+
+### "imwbcnt - happy":
+
+- Similar to the previous case, this output shows the ANOVA test results for the relationship between "imwbcnt" and "happy."
+- The p-value is much smaller (nearly 0), indicating that the relationship between "imwbcnt" and "happy" is statistically significant.
+
+### "imwbcnt - chldhhe":
+
+- The ANOVA test is conducted to assess the relationship between "imwbcnt" and "chldhhe."
+- The p-value (0.0507) is slightly above the significance level of 0.05, suggesting that the relationship between "imwbcnt" and "chldhhe" may not be statistically significant.
+<span style="color: red;">We can see that ANOVA shows opposite results comparing to our non-parametric methods</span>
+
+### "imwbcnt - agea":
+
+- This output represents the ANOVA test results for the relationship between "imwbcnt" and "agea."
+- The p-value (0.000125) is much smaller than 0.05, indicating that the relationship between "imwbcnt" and "agea" is statistically significant.
+
+# n*n Anova
+
+```{r}
+anova_results <- aov(imwbcnt ~ happy * chldhhe * agea * hinctnta , data = dataset)
+summary(anova_results)
+```
+This multiple-factor ANOVA analysis reveals that "happy," "chldhhe," and "agea" have significant individual effects on "imwbcnt." However, "hinctnta" does not significantly influence "imwbcnt." Additionally, some interactions between factors are significant, indicating that the combined effects of certain factors are also relevant to "imwbcnt."
+
+<span style="color: red;">We can see that n*n ANOVA shows opposite result comparing to our non-parametric methods regarding the agea</span>
+
+# Regression & Correlation
+
+```{r}
+model <- lm(imwbcnt ~ hinctnta + agea + chldhhe + happy, data = dataset)
+summary(model)
+
+# Create a list of variable combinations
+variables <- c("imwbcnt", "hinctnta", "agea", "chldhhe", "happy")
+
+# Initialize an empty matrix to store the p-values
+p_values <- matrix(NA, nrow = length(variables), ncol = length(variables))
+rownames(p_values) <- colnames(p_values) <- variables
+
+# Calculate p-values for correlation coefficients
+for (i in 1:length(variables)) {
+  for (j in 1:length(variables)) {
+    p_values[i, j] <- cor.test(dataset[[variables[i]]], dataset[[variables[j]]])$p.value
+  }
+}
+
+# Print the p-values matrix
+print(p_values)
+cor_matrix <- cor(dataset[c("imwbcnt", "hinctnta", "agea", "chldhhe", "happy")])
+print(cor_matrix)
+```
+Coefficients:
+
+The intercept represents the expected value of "imwbcnt" when all predictor variables are zero. In this case, when all predictor variables are zero, the estimated value of "imwbcnt" is approximately 2.0914.
+
+hinctnta: The estimated coefficient for "hinctnta" is -0.020947. This means that for a one-unit increase in "hinctnta," we expect a decrease of approximately 0.020947 units in "imwbcnt," holding all other predictor variables constant. However, the p-value for this coefficient is 0.2995, which indicates that the relationship between "hinctnta" and "imwbcnt" is not statistically significant at the 0.05 significance level.
+
+agea: The estimated coefficient for "agea" is -0.007068. This means that for a one-unit increase in "agea," we expect a decrease of approximately 0.007068 units in "imwbcnt," holding all other predictor variables constant. The p-value for this coefficient is 0.0101, which indicates that the relationship between "agea" and "imwbcnt" is statistically significant at the 0.05 significance level.
+
+chldhhe: The estimated coefficient for "chldhhe" is 0.109680. This means that for a one-unit increase in "chldhhe," we expect an increase of approximately 0.109680 units in "imwbcnt," holding all other predictor variables constant. However, the p-value for this coefficient is 0.3007, which indicates that the relationship between "chldhhe" and "imwbcnt" is not statistically significant at the 0.05 significance level.
+
+happy: The estimated coefficient for "happy" is 0.334785. This means that for a one-unit increase in "happy," we expect an increase of approximately 0.334785 units in "imwbcnt," holding all other predictor variables constant. The p-value for this coefficient is < 2.2e-16, which indicates that the relationship between "happy" and "imwbcnt" is highly statistically significant.
+
+Residual standard error: The residual standard error is a measure of the average amount by which the observed "imwbcnt" values deviate from the predicted values by the regression model. In this case, the residual standard error is approximately 2.249.
+
+Multiple R-squared and Adjusted R-squared: These values represent the proportion of variance in the response variable "imwbcnt" that can be explained by the predictor variables "hinctnta," "agea," "chldhhe," and "happy." The multiple R-squared is 0.06338, which means that approximately 6.34% of the variability in "imwbcnt" is explained by the model. The adjusted R-squared (which accounts for the number of predictor variables and the sample size) is 0.06188.
+
+F-statistic and p-value: The F-statistic tests whether there is a significant linear relationship between the predictor variables as a group and the response variable "imwbcnt." In this case, the F-statistic is 42.19 with a p-value of < 2.2e-16, indicating that there is a significant linear relationship between the predictor variables and "imwbcnt" as a group.
+
+Correlation matrix: The correlation matrix shows the pairwise correlations between the response variable "imwbcnt" and the predictor variables "hinctnta," "agea," "chldhhe," and "happy." Each cell in the matrix represents the correlation coefficient between two variables. For example, the correlation between "imwbcnt" and "happy" is 0.24246737, indicating a positive correlation between these variables. The diagonal elements of the matrix (top-left to bottom-right) represent the correlations of each variable with itself, and they are all equal to 1.
+
+Overall, the regression analysis suggests that "happy" has a significant positive effect on "imwbcnt," "agea" has a significant negative effect on "imwbcnt," while "hinctnta" and "chldhhe" do not have statistically significant effects on "imwbcnt." The model explains a relatively small proportion of the total variability in "imwbcnt" (6.34%), indicating that other factors not included in the model may also influence "imwbcnt."
+
+### - Correlation Heatmap
+
+```{r}
+# Plot the correlation heatmap
+heatmap(cor_matrix, main = "Correlation Heatmap")
+
+```
+
+# Discussion
+
+## H1 - People with higher income levels (hinctnta) are more likely to believe that immigrants make the country a better place to live.
+
+The Wilcoxon rank sum test with continuity correction shows a p-value of 0.003429, indicating that there is a statistically significant difference in beliefs between people with different income levels. However, the Kruskal-Wallis rank sum test does not show a significant overall relationship between "hinctnta" and "imwbcnt."
+
+## H2 - People who report higher levels of happiness (happy) are more likely to believe that immigrants make the country a better place to live.
+
+Both the Wilcoxon rank sum test (p-value = 1.671e-12) and the Kruskal-Wallis rank sum test (p-value < 2.2e-16) suggest that there is a significant association between "happy" and "imwbcnt." This indicates that people who report higher levels of happiness are indeed more likely to believe that immigrants make the country a better place to live.
+
+## H3 - People with children (chldhhe) are more likely to believe that immigrants make the country a better place to live.
+
+The Wilcoxon rank sum test with continuity correction shows a p-value of 0.0507, suggesting that there is a weak statistical significance in the difference in beliefs between people with and without children. However, the Kruskal-Wallis rank sum test does not indicate a significant overall relationship between "chldhhe" and "imwbcnt."
+
+## H4 - Younger people (age) are more likely to believe that immigrants make the country a better place to live.
+
+The Kruskal-Wallis rank sum test shows a p-value of 0.0273, indicating that there is a statistically significant association between "agea" and "imwbcnt." This suggests that younger people are more likely to believe that immigrants make the country a better place to live.
+
+
+# Conclusion
+
+Overall, the results provide mixed support for the hypotheses. Higher levels of happiness (happy) and younger age (agea) are both positively associated with the belief that immigrants make the country a better place to live. However, the relationship between income (hinctnta) and belief in immigrant impact is not as clear-cut and may require further investigation. Similarly, while there is a weak indication of an association between having children (chldhhe) and belief in immigrant impact, it is not strongly supported.
